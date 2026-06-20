@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import type { CanFrame, DbcMessage, BusStats } from '../types';
+import { ref, computed, watch } from 'vue';
+import type { CanFrame, DbcMessage, BusStats, ValidationResult, ValidationSummary } from '../types';
 import { parseDbc, decodeCanFrame, DEFAULT_DBC_CONTENT } from '../utils/dbc-parser';
+import { validateDefinitions, getValidationSummary } from '../utils/validation';
 
 let frameIdCounter = 0;
 
@@ -13,6 +14,19 @@ export const useCanBusStore = defineStore('canbus', () => {
   const filterText = ref('');
   const isCapturing = ref(false);
   const pollInterval = ref<number | null>(null);
+
+  const validationResult = ref<ValidationResult>({
+    issues: [],
+    totalIssues: 0,
+    errorCount: 0,
+    warningCount: 0,
+    infoCount: 0,
+    lastValidated: 0
+  });
+
+  const autoValidate = ref(true);
+  let lastValidationTime = 0;
+  const VALIDATION_THROTTLE_MS = 1000;
 
   const busStats = ref<BusStats>({
     totalFrames: 0,
@@ -52,6 +66,13 @@ export const useCanBusStore = defineStore('canbus', () => {
     return busStats.value.busLoad.toFixed(1);
   });
 
+  const validationSummary = computed((): ValidationSummary => {
+    return getValidationSummary(validationResult.value);
+  });
+
+  const hasValidationErrors = computed(() => validationResult.value.errorCount > 0);
+  const hasValidationWarnings = computed(() => validationResult.value.warningCount > 0);
+
   function addFrame(frame: CanFrame) {
     frames.value.push(frame);
     if (frames.value.length > 500) {
@@ -82,6 +103,14 @@ export const useCanBusStore = defineStore('canbus', () => {
 
     // Simulate bus load (random 15-45%)
     busStats.value.busLoad = 15 + Math.random() * 30;
+
+    if (autoValidate.value) {
+      const now = Date.now();
+      if (now - lastValidationTime > VALIDATION_THROTTLE_MS) {
+        lastValidationTime = now;
+        runValidation();
+      }
+    }
   }
 
   function clearFrames() {
@@ -96,6 +125,9 @@ export const useCanBusStore = defineStore('canbus', () => {
       lastUpdate: Date.now()
     };
     frameIdCounter = 0;
+    if (autoValidate.value) {
+      runValidation();
+    }
   }
 
   function loadMockDbc() {
@@ -104,6 +136,20 @@ export const useCanBusStore = defineStore('canbus', () => {
 
   function parseAndLoadDbc(text: string) {
     dbcMessages.value = parseDbc(text);
+    if (autoValidate.value) {
+      runValidation();
+    }
+  }
+
+  function runValidation() {
+    validationResult.value = validateDefinitions(frames.value, dbcMessages.value);
+  }
+
+  function toggleAutoValidate(enabled: boolean) {
+    autoValidate.value = enabled;
+    if (enabled) {
+      runValidation();
+    }
   }
 
   function generateMockFrame(): CanFrame {
@@ -206,6 +252,11 @@ export const useCanBusStore = defineStore('canbus', () => {
     isCapturing,
     filteredFrames,
     busLoadPercent,
+    validationResult,
+    validationSummary,
+    autoValidate,
+    hasValidationErrors,
+    hasValidationWarnings,
     addFrame,
     clearFrames,
     loadMockDbc,
@@ -213,6 +264,8 @@ export const useCanBusStore = defineStore('canbus', () => {
     startCapture,
     stopCapture,
     decodeFrame,
-    exportFrames
+    exportFrames,
+    runValidation,
+    toggleAutoValidate
   };
 });

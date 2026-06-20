@@ -36,3 +36,44 @@ export interface BusStats {
   busLoad: number;
   lastUpdate: number;
 }
+
+export type ValidationSeverity = 'error' | 'warning' | 'info';
+
+export type ValidationCategory =
+  | 'missing_definition'
+  | 'duplicate_signal'
+  | 'undecodable_frame'
+  | 'signal_overlap'
+  | 'invalid_dlc'
+  | 'value_out_of_range';
+
+export interface ValidationIssue {
+  id: string;
+  severity: ValidationSeverity;
+  category: ValidationCategory;
+  title: string;
+  description: string;
+  suggestion: string;
+  messageId?: number;
+  signalName?: string;
+  frameId?: string;
+  timestamp?: number;
+}
+
+export interface ValidationResult {
+  issues: ValidationIssue[];
+  totalIssues: number;
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+  lastValidated: number;
+}
+
+export interface ValidationSummary {
+  missingDefinitions: number;
+  duplicateSignals: number;
+  undecodableFrames: number;
+  signalOverlaps: number;
+  invalidDlcs: number;
+  valueOutOfRanges: number;
+}

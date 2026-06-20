@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useCanBusStore } from './store/canbus';
 import FrameTable from './components/FrameTable.vue';
 import SignalChart from './components/SignalChart.vue';
+import ValidationCenter from './components/ValidationCenter.vue';
 
 const store = useCanBusStore();
+const rightPanelTab = ref<'chart' | 'validation'>('chart');
 
 function handleLoadDbc() {
   store.loadMockDbc();
@@ -73,9 +76,42 @@ function handleExport() {
         <FrameTable />
       </div>
 
-      <!-- Right Panel: Signal Chart (40%) -->
+      <!-- Right Panel: Signal Chart / Validation Center (40%) -->
       <div class="w-2/5 flex flex-col overflow-hidden">
-        <SignalChart />
+        <!-- Tab Bar -->
+        <div class="flex bg-gray-800 border-b border-gray-700 shrink-0">
+          <button
+            @click="rightPanelTab = 'chart'"
+            class="flex-1 px-4 py-2 text-sm font-medium transition-colors border-b-2"
+            :class="rightPanelTab === 'chart'
+              ? 'text-cyan-400 border-cyan-500 bg-gray-800/80'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-700/50'"
+          >
+            信号图表
+          </button>
+          <button
+            @click="rightPanelTab = 'validation'"
+            class="flex-1 px-4 py-2 text-sm font-medium transition-colors border-b-2 relative"
+            :class="rightPanelTab === 'validation'
+              ? 'text-amber-400 border-amber-500 bg-gray-800/80'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-700/50'"
+          >
+            校验中心
+            <span
+              v-if="store.validationResult.totalIssues > 0"
+              class="absolute top-1.5 right-3 w-5 h-5 flex items-center justify-center text-xs font-bold rounded-full"
+              :class="store.hasValidationErrors ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white'"
+            >
+              {{ store.validationResult.totalIssues > 99 ? '99+' : store.validationResult.totalIssues }}
+            </span>
+          </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="flex-1 overflow-hidden">
+          <SignalChart v-show="rightPanelTab === 'chart'" />
+          <ValidationCenter v-show="rightPanelTab === 'validation'" />
+        </div>
       </div>
     </main>
 
@@ -88,6 +124,15 @@ function handleExport() {
           </span>
         </span>
         <span>DBC消息: {{ store.dbcMessages.size }}</span>
+        <span
+          v-if="store.validationResult.totalIssues > 0"
+          class="cursor-pointer"
+          @click="rightPanelTab = 'validation'"
+        >
+          <span :class="store.hasValidationErrors ? 'text-red-400' : 'text-yellow-400'">
+            ⚠ 校验问题: {{ store.validationResult.totalIssues }}
+          </span>
+        </span>
       </div>
       <div class="flex items-center gap-4 text-gray-500">
         <span>帧数: {{ store.busStats.totalFrames }}</span>

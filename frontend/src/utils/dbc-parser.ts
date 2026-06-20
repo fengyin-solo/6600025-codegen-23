@@ -133,3 +133,49 @@ BO_ 2025 OBD_Response_Transmission: 8 ECU
  SG_ ThrottlePosition : 32|8@1+ (0.392,0) [0|100] "%" Dashboard
  SG_ EngineLoad : 40|8@1+ (0.392,0) [0|100] "%" Dashboard
 `;
+
+export const PROBLEMATIC_DBC_CONTENT = `VERSION ""
+
+NS_ :
+
+BS_:
+
+BU_: ECM TCM BCM Sensor1
+
+BO_ 1000 Engine_Control: 8 ECM
+ SG_ EngineRPM : 0|16@1+ (0.25,0) [0|16383.75] "rpm" TCM
+ SG_ CoolantTemp : 16|8@1+ (1,-40) [-40|215] "degC" BCM
+ SG_ ThrottlePosition : 24|8@1+ (0.392,0) [0|100] "%" BCM
+ SG_ EngineRPM : 24|8@1+ (1,0) [0|255] "" TCM
+
+BO_ 1001 Transmission_Status: 8 TCM
+ SG_ CurrentGear : 0|4@1+ (1,0) [0|10] "" ECM
+ SG_ GearRatio : 4|12@1+ (0.001,0) [0|4.095] "" ECM
+ SG_ InputSpeed : 0|16@1+ (0.25,0) [0|16383.75] "rpm" ECM
+ SG_ TorqueConverter : 16|16@1+ (0.1,0) [0|6553.5] "Nm" ECM
+ SG_ EngineRPM : 16|8@1+ (1,0) [0|255] "rpm" BCM
+
+BO_ 1002 Body_Control: 6 BCM
+ SG_ Headlights : 0|1@1+ (1,0) [0|1] "" Sensor1
+ SG_ Wipers : 1|1@1+ (1,0) [0|1] "" Sensor1
+ SG_ DoorLock : 2|1@1+ (1,0) [0|1] "" Sensor1
+ SG_ WindowPos : 8|10@1+ (0.1,0) [0|100] "%" Sensor1
+ SG_ MirrorAngle : 10|6@1+ (1,0) [0|60] "deg" Sensor1
+
+BO_ 1003 Sensor_Array: 8 Sensor1
+ SG_ Accelerator : 0|16@1+ (0.001,0) [0|1] "" ECM
+ SG_ BrakePressure : 32|8@1+ (0.5,0) [0|100] "bar" ECM
+ SG_ SteerAngle : 0|16@1+ (0.1,-800) [-800|800] "deg" ECM
+ SG_ YawRate : 16|16@1+ (0.01,-327) [-327|327] "deg/s" ECM
+
+BO_ 1004 Undecodable_Msg: 8 BCM
+ SG_ MagicData1 : 0|64@1+ (1,0) [0|0] "" ECM
+ SG_ MagicData2 : 60|8@1+ (1,0) [0|100] "" ECM
+
+BO_ 1005 Broadcast_All: 8 ECM
+ SG_ VehicleSpeed : 0|8@1+ (1,0) [0|255] "km/h" TCM
+ SG_ VehicleSpeed : 16|8@1+ (1,0) [0|255] "km/h" BCM
+ SG_ FuelLevel : 8|8@1+ (0.4,0) [0|100] "%" BCM
+`;
+
+export const UNDEFINED_FRAME_IDS = [0x7E0, 0x7E8, 0x7DF, 0x7EC, 0x7EE, 0x100, 0x101, 0x500, 0x501];

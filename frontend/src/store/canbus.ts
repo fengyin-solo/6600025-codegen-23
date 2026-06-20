@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import type { CanFrame, DbcMessage, BusStats, ValidationResult, ValidationSummary } from '../types';
-import { parseDbc, decodeCanFrame, DEFAULT_DBC_CONTENT } from '../utils/dbc-parser';
+import { parseDbc, decodeCanFrame, DEFAULT_DBC_CONTENT, PROBLEMATIC_DBC_CONTENT, UNDEFINED_FRAME_IDS } from '../utils/dbc-parser';
 import { validateDefinitions, getValidationSummary } from '../utils/validation';
 
 let frameIdCounter = 0;
@@ -134,6 +134,10 @@ export const useCanBusStore = defineStore('canbus', () => {
     parseAndLoadDbc(DEFAULT_DBC_CONTENT);
   }
 
+  function loadProblematicDbc() {
+    parseAndLoadDbc(PROBLEMATIC_DBC_CONTENT);
+  }
+
   function parseAndLoadDbc(text: string) {
     dbcMessages.value = parseDbc(text);
     if (autoValidate.value) {
@@ -153,50 +157,56 @@ export const useCanBusStore = defineStore('canbus', () => {
   }
 
   function generateMockFrame(): CanFrame {
-    const messageIds = Array.from(dbcMessages.value.keys());
-    const arbId = messageIds.length > 0
-      ? messageIds[Math.floor(Math.random() * messageIds.length)]
-      : 0x7DF;
+    const definedMessageIds = Array.from(dbcMessages.value.keys());
 
-    const msgDef = dbcMessages.value.get(arbId);
+    const rand = Math.random();
+    let arbId: number;
+    let msgDef: DbcMessage | undefined;
+    let dlcOverride: number;
+    let dataBytes: number[];
+    let corruptedData = false;
 
-    // Generate realistic OBD-II values
-    const rpm = Math.floor(800 + Math.random() * 5200);
-    const speed = Math.floor(Math.random() * 120);
-    const temp = Math.floor(70 + Math.random() * 35);
-    const throttle = Math.floor(Math.random() * 100);
-    const load = Math.floor(Math.random() * 100);
+    if (rand < 0.25 && UNDEFINED_FRAME_IDS.length > 0) {
+      arbId = UNDEFINED_FRAME_IDS[Math.floor(Math.random() * UNDEFINED_FRAME_IDS.length)];
+      msgDef = undefined;
+      dlcOverride = 8;
+      dataBytes = Array.from({ length: 8 }, () => Math.floor(Math.random() * 256));
+    } else if (rand < 0.35 && definedMessageIds.length > 0) {
+      arbId = definedMessageIds[Math.floor(Math.random() * definedMessageIds.length)];
+      msgDef = dbcMessages.value.get(arbId);
+      dlcOverride = Math.max(1, (msgDef?.dlc ?? 8) - 1);
+      dataBytes = Array.from({ length: dlcOverride }, () => Math.floor(Math.random() * 256));
+      corruptedData = true;
+    } else if (definedMessageIds.length > 0) {
+      arbId = definedMessageIds[Math.floor(Math.random() * definedMessageIds.length)];
+      msgDef = dbcMessages.value.get(arbId);
+      dlcOverride = msgDef?.dlc ?? 8;
+      dataBytes = Array.from({ length: 8 }, () => Math.floor(Math.random() * 256));
+    } else {
+      arbId = 0x7DF;
+      msgDef = undefined;
+      dlcOverride = 8;
+      dataBytes = Array.from({ length: 8 }, () => Math.floor(Math.random() * 256));
+    }
 
-    // Encode values into bytes (simplified encoding for display)
-    const rpmRaw = Math.round(rpm / 0.25);
-    const rpmLow = rpmRaw & 0xFF;
-    const rpmHigh = (rpmRaw >> 8) & 0xFF;
-    const speedByte = speed & 0xFF;
-    const tempByte = (temp + 40) & 0xFF;
-    const throttleByte = Math.round(throttle / 0.392) & 0xFF;
-    const loadByte = Math.round(load / 0.392) & 0xFF;
-
-    const dataBytes = [rpmLow, rpmHigh, speedByte, tempByte, throttleByte, loadByte, 0x00, 0x00];
     const dataHex = dataBytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 
     const frame: CanFrame = {
       id: `frame-${++frameIdCounter}`,
       timestamp: Date.now(),
       arbitrationId: arbId,
-      dlc: 8,
+      dlc: dlcOverride,
       data: dataHex,
       decoded: {},
       direction: Math.random() > 0.3 ? 'RX' : 'TX'
     };
 
-    if (msgDef) {
-      frame.decoded = {
-        EngineRPM: rpm,
-        VehicleSpeed: speed,
-        CoolantTemp: temp,
-        ThrottlePosition: throttle,
-        EngineLoad: load
-      };
+    if (msgDef && !corruptedData) {
+      try {
+        frame.decoded = decodeCanFrame(frame, msgDef);
+      } catch {
+        frame.decoded = {};
+      }
     }
 
     return frame;
@@ -260,6 +270,7 @@ export const useCanBusStore = defineStore('canbus', () => {
     addFrame,
     clearFrames,
     loadMockDbc,
+    loadProblematicDbc,
     parseAndLoadDbc,
     startCapture,
     stopCapture,
